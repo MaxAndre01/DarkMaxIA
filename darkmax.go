@@ -23,7 +23,15 @@ import (
 // ══════════════════════════════════════════
 // CAMBIA SOLO ESTAS DOS LINEAS
 const TELEGRAM  = "8444790565:AAFZJvpPGFBZAjm-jvmYkiVXQcIRiCMH3rg"
-const OPENROUTER = "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"
+
+// En la parte superior de tu archivo darkmax.go
+var OPENROUTER_KEYS = []string{
+    "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",
+    "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",
+    "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",
+    "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",
+    "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",
+}
 // ══════════════════════════════════════════
 var MODELS = []string{
 	// 1. Google (Muy rápidos y estables)
@@ -243,7 +251,7 @@ func (s *Store) AllSessions() []*Session {
 	return list
 }
 
-// ─── IA ──────────────────────────────────
+
 func askAI(ctx context.Context, msg, rank string) (string, error) {
 	type M struct {
 		Role    string `json:"role"`
@@ -267,57 +275,53 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
 	if rank == "admin" { sys += " Usuario ADMIN, máximo detalle." }
 	if rank == "vip" { sys += " Usuario VIP, respuestas detalladas." }
 
-	// Preparar cuerpo base
 	reqStruct := Req{Messages: []M{{"system", sys}, {"user", msg}}}
-
 	hc := &http.Client{Timeout: 60 * time.Second}
 
+	// Bucle principal: recorre modelos y luego llaves
 	for _, model := range MODELS {
-		reqStruct.Model = model
-		reqBody, _ := json.Marshal(reqStruct)
+		for _, key := range OPENROUTER_KEYS { // ROTACIÓN DE LLAVES
+			reqStruct.Model = model
+			reqBody, _ := json.Marshal(reqStruct)
 
-		r, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
-		if err != nil {
-			continue
-		}
+			r, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
+			if err != nil { continue }
 
-		r.Header.Set("Authorization", "Bearer "+OPENROUTER)
-		r.Header.Set("Content-Type", "application/json")
-		r.Header.Set("HTTP-Referer", "https://darkmax-ai.com")
-// 		r.Header.Set("X-Title", "DarkMax")
+			r.Header.Set("Authorization", "Bearer "+key)
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("HTTP-Referer", "https://darkmax-ai.com")
 
-		resp, err := hc.Do(r)
-		if err != nil {
-			continue
-		}
+			resp, err := hc.Do(r)
+			if err != nil { continue }
 
-		data, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+			data, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 
-		// Si el código de estado no es 200, logueamos el error y saltamos al siguiente modelo
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("OpenRouter Error %d: %s", resp.StatusCode, string(data))
-			continue
-		}
+			// Si el status no es 200, registramos el error y probamos la siguiente llave/modelo
+			if resp.StatusCode != http.StatusOK {
+				log.Printf("Fallo con llave %s | Status %d: %s", key[:8], resp.StatusCode, string(data))
+				continue 
+			}
 
-		var res Res
-		if err := json.Unmarshal(data, &res); err != nil {
-			continue
-		}
+			var res Res
+			if err := json.Unmarshal(data, &res); err != nil {
+				continue
+			}
 
-		if res.Error != nil {
-			log.Printf("API Error: %s", res.Error.Message)
-			continue
-		}
+			if res.Error != nil {
+				log.Printf("API Error con llave %s: %s", key[:8], res.Error.Message)
+				continue
+			}
 
-		if len(res.Choices) > 0 {
-			t := strings.TrimSpace(res.Choices[0].Message.Content)
-			if t != "" {
-				return t, nil
+			if len(res.Choices) > 0 {
+				t := strings.TrimSpace(res.Choices[0].Message.Content)
+				if t != "" {
+					return t, nil // Éxito!
+				}
 			}
 		}
 	}
-	return "", fmt.Errorf("todos los modelos fallaron. Revisa: 1. Tu API Key. 2. Si tienes créditos en OpenRouter.")
+	return "", fmt.Errorf("todos los modelos y llaves fallaron. Revisa tus créditos y límites.")
 }
 
 // ─── BOT ─────────────────────────────────
@@ -710,22 +714,11 @@ func dur(d time.Duration) string {
 
 // ─── MAIN ────────────────────────────────
 func main() {
-	if OPENROUTER == "" {
-		log.Fatal("ERROR: Pon tu key de OpenRouter en la constante OPENROUTER (linea 24)\nCreala gratis en: https://openrouter.ai/keys")
+	// Verificación: Aseguramos que la lista no esté vacía
+	if len(OPENROUTER_KEYS) == 0 {
+		log.Fatal("ERROR: Debes añadir al menos una llave en la lista OPENROUTER_KEYS")
 	}
 
-	// Servidor web para la página
-	go func() {
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080"
-		}
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "index.html")
-		})
-		log.Printf("Web server en puerto %s", port)
-		log.Fatal(http.ListenAndServe(":"+port, nil))
-	}()
 
 	bot, err := newBot()
 	if err != nil { log.Fatalf("Error: %v", err) }
