@@ -1,0 +1,14 @@
+{
+  "keys": {
+    "DARKMAX-DEMO": {
+      "key": "DARKMAX-DEMO",
+      "rank": "user",
+      "owner": "Demo",
+      "by": "system",
+      "at": "2026-03-09T17:29:54.512561229-04:00",
+      "active": true,
+      "uses": 0
+    }
+  },
+  "admin_key": "DARKMAX-ADMIN-2024"
+}
