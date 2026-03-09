@@ -82,6 +82,14 @@ func (b *Bot) worker(jobs <-chan tgbotapi.Update) {
 		b.handleUpdate(update)
 	}
 }
+func (b *Bot) handleLogout(chatID int64, username string) {
+    if !b.store.IsAuthorized(chatID) {
+        b.sendStart(chatID)
+        return
+    }
+    b.store.Logout(chatID)
+    b.send(chatID, "Sesion cerrada. Hasta luego @"+username+"!\n\nIntroduce tu keymaster para volver a entrar:")
+}
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	if update.CallbackQuery != nil {
@@ -120,6 +128,8 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	switch msg.Command() {
+		case "logout":
+    b.handleLogout(chatID, msg.From.UserName)
 	case "start":
 		b.sendStart(chatID)
 	case "help":
@@ -314,6 +324,14 @@ func (b *Bot) handleAdminCommand(chatID int64, username, text string) {
 		b.send(chatID, b.admin.ListAllKeys())
 	case "/sessions":
 		b.send(chatID, b.admin.ActiveSessions())
+		case "/logout":
+    b.handleLogout(chatID, username)
+case "/perfil":
+    b.sendUserPanel(chatID)
+case "/menu":
+    b.sendMainMenu(chatID)
+case "/help":
+    b.sendHelp(chatID)
 	default:
 		b.handleAIQuery(chatID, username, text)
 	}
@@ -509,27 +527,3 @@ func rankIcon(rank auth.KeyRank) string {
 	}
 }
 
-
-func formatDuration(d time.Duration) string {
-	d = d.Round(time.Minute)
-	h := d / time.Hour
-	d -= h * time.Hour
-	m := d / time.Minute
-	if h > 0 {
-		return fmt.Sprintf("%dh %dm", h, m)
-	}
-	return fmt.Sprintf("%dm", m)
-}
-
-// maskKey oculta parte de la key por seguridad: DM-ABCD1234 → DM-****1234
-func maskKey(key string) string {
-	if len(key) <= 6 {
-		return "****"
-	}
-	visible := 4
-	masked := len(key) - visible
-	if masked < 4 {
-		masked = 4
-	}
-	return key[:len(key)-masked] + strings.Repeat("*", masked-visible) + key[len(key)-visible:]
-}
