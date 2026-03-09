@@ -271,3 +271,13 @@ func (s *Store) save() error {
 	return os.WriteFile(s.filePath, data, 0600)
 }
 
+// Logout elimina la sesion activa del usuario
+func (s *Store) Logout(chatID int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, exists := s.sessions[chatID]
+	if exists {
+		delete(s.sessions, chatID)
+	}
+	return exists
+}

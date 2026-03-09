@@ -509,3 +509,27 @@ func rankIcon(rank auth.KeyRank) string {
 	}
 }
 
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Minute)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	return fmt.Sprintf("%dm", m)
+}
+
+// maskKey oculta parte de la key por seguridad: DM-ABCD1234 → DM-****1234
+func maskKey(key string) string {
+	if len(key) <= 6 {
+		return "****"
+	}
+	visible := 4
+	masked := len(key) - visible
+	if masked < 4 {
+		masked = 4
+	}
+	return key[:len(key)-masked] + strings.Repeat("*", masked-visible) + key[len(key)-visible:]
+}
