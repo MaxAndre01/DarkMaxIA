@@ -1,0 +1,130 @@
+[2026-03-08 22:21:47] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:21:48] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:21:48] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:22:54] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:22:54] [AUTH ] ChatID=7160744560 Key=hola Result=DENIED
+[2026-03-08 22:23:29] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-ADMIN-2024"
+[2026-03-08 22:23:29] [AUTH ] ChatID=7160744560 Key=DARKMAX-ADMIN-2024 Result=ADMIN_ACCESS
+[2026-03-08 22:23:42] [REQ  ] User=7160744560 (@MaximPerez) Msg="/listkeys"
+[2026-03-08 22:23:49] [REQ  ] User=7160744560 (@MaximPerez) Msg="/sessions"
+[2026-03-08 22:24:34] [REQ  ] User=7160744560 (@MaximPerez) Msg="jose"
+[2026-03-08 22:24:38] [ADMIN] By=MaximPerez Action=CREATE_KEY key=DM-9D443A2D07A782BC owner=jose rank=user
+[2026-03-08 22:26:17] [REQ  ] User=7160744560 (@MaximPerez) Msg="- Programacion quiero que me crees un programa q sea de generador de contraseña..."
+[2026-03-08 22:26:18] [ERROR] AI error for 7160744560: AI error: error, status code: 429, message: Provider returned error
+[2026-03-08 22:26:28] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:26:28] [ERROR] AI error for 7160744560: AI error: error, status code: 429, message: Provider returned error
+[2026-03-08 22:26:49] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:27:54] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:28:07] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:28:07] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:28:16] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:34:22] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:34:22] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:34:22] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:34:27] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:34:27] [AUTH ] ChatID=7160744560 Key=hola Result=DENIED
+[2026-03-08 22:34:37] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-ADMIN-2024"
+[2026-03-08 22:34:37] [AUTH ] ChatID=7160744560 Key=DARKMAX-ADMIN-2024 Result=ADMIN_ACCESS
+[2026-03-08 22:34:53] [REQ  ] User=7160744560 (@MaximPerez) Msg="/setrank"
+[2026-03-08 22:35:02] [REQ  ] User=7160744560 (@MaximPerez) Msg="/perfil"
+[2026-03-08 22:35:24] [REQ  ] User=7160744560 (@MaximPerez) Msg="/start"
+[2026-03-08 22:35:31] [REQ  ] User=7160744560 (@MaximPerez) Msg="/menu"
+[2026-03-08 22:35:44] [REQ  ] User=7160744560 (@MaximPerez) Msg="/help"
+[2026-03-08 22:35:49] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:36:19] [REQ  ] User=7160744560 (@MaximPerez) Msg="- Programacion quiero que me crees un programa q sea de generador de contraseña..."
+[2026-03-08 22:40:05] [REQ  ] User=8002664118 (@NeoParadox7) Msg="/start"
+[2026-03-08 22:40:26] [REQ  ] User=8002664118 (@NeoParadox7) Msg="H.h."
+[2026-03-08 22:40:26] [AUTH ] ChatID=8002664118 Key=H.h. Result=DENIED
+[2026-03-08 22:42:01] [REQ  ] User=8002664118 (@NeoParadox7) Msg="DM-9D443A2D07A782BC"
+[2026-03-08 22:42:01] [AUTH ] ChatID=8002664118 Key=DM-9D443A2D07A782BC Result=ACCESS_GRANTED rank=user
+[2026-03-08 22:42:10] [REQ  ] User=8002664118 (@NeoParadox7) Msg="Hola"
+[2026-03-08 22:42:12] [ERROR] AI error for 8002664118: AI error: error, status code: 400, message: google/gemini-2.0-flash-lite-preview-02-05:free is not a valid model ID
+[2026-03-08 22:42:22] [REQ  ] User=8002664118 (@NeoParadox7) Msg="Hacking"
+[2026-03-08 22:42:23] [ERROR] AI error for 8002664118: AI error: error, status code: 400, message: google/gemini-2.0-flash-lite-preview-02-05:free is not a valid model ID
+[2026-03-08 22:42:44] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:42:45] [ERROR] AI error for 7160744560: AI error: error, status code: 400, message: google/gemini-2.0-flash-lite-preview-02-05:free is not a valid model ID
+[2026-03-08 22:43:20] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:43:21] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:44:33] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:44:33] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:44:33] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:45:37] [REQ  ] User=8002664118 (@NeoParadox7) Msg="DARKMAX-ADMIN-2024"
+[2026-03-08 22:45:37] [AUTH ] ChatID=8002664118 Key=DARKMAX-ADMIN-2024 Result=ADMIN_ACCESS
+[2026-03-08 22:46:13] [REQ  ] User=8002664118 (@NeoParadox7) Msg="Ciberseguridad"
+[2026-03-08 22:46:14] [ERROR] AI error for 8002664118: AI error: error, status code: 404, message: No endpoints found for deepseek/deepseek-chat:free.
+[2026-03-08 22:46:29] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:46:31] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:46:31] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:46:31] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:46:57] [REQ  ] User=7160744560 (@MaximPerez) Msg="d"
+[2026-03-08 22:46:57] [AUTH ] ChatID=7160744560 Key=d Result=DENIED
+[2026-03-08 22:47:04] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 22:47:04] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 22:47:08] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 22:47:09] [ERROR] AI error for 7160744560: AI error: error, status code: 404, message: No endpoints found for deepseek/deepseek-chat:free.
+[2026-03-08 22:47:13] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:52:18] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:52:19] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:52:19] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:53:37] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 22:53:37] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 22:53:39] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 22:53:40] [ERROR] AI error for 7160744560: AI error: error, status code: 404, message: No endpoints found for deepseek/deepseek-chat:free.
+[2026-03-08 22:56:33] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 22:58:54] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 22:58:56] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 22:58:56] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 22:59:36] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 22:59:36] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 22:59:38] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 22:59:40] [ERROR] AI error for 7160744560: todos los modelos fallaron — revisa tu API key en openrouter.ai/keys. Ultimo error: error, status code: 429, message: Provider returned error
+[2026-03-08 23:00:24] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:03:35] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:03:36] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:03:36] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:03:43] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 23:03:43] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 23:03:44] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 23:03:44] [ERROR] AI error for 7160744560: todos los modelos fallaron — revisa tu API key en openrouter.ai/keys. Ultimo error: %!w(<nil>)
+[2026-03-08 23:04:03] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:04:54] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:04:55] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:04:55] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:05:04] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 23:05:04] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 23:05:05] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 23:05:05] [ERROR] AI error for 7160744560: todos los modelos fallaron — revisa tu API key en openrouter.ai/keys. Ultimo error: %!w(<nil>)
+[2026-03-08 23:05:10] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:05:59] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:06:00] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:06:00] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:06:08] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 23:06:08] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 23:06:10] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 23:06:10] [ERROR] AI error for 7160744560: AI Fatal Error: error, status code: 400, message: google/gemini-2.0-flash-lite-preview-02-05:free is not a valid model ID
+[2026-03-08 23:07:11] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:07:12] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:07:13] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:07:13] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:07:20] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 23:07:20] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 23:07:21] [REQ  ] User=7160744560 (@MaximPerez) Msg="s"
+[2026-03-08 23:07:33] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola como estas"
+[2026-03-08 23:09:12] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:10:38] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:10:39] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:10:39] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:10:47] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-DEMO"
+[2026-03-08 23:10:47] [AUTH ] ChatID=7160744560 Key=DARKMAX-DEMO Result=ACCESS_GRANTED rank=user
+[2026-03-08 23:10:50] [REQ  ] User=7160744560 (@MaximPerez) Msg="hola"
+[2026-03-08 23:11:16] [REQ  ] User=7160744560 (@MaximPerez) Msg="como estas"
+[2026-03-08 23:11:38] [INFO ] 🛑 DarkMax IA apagándose...
+[2026-03-08 23:18:36] [INFO ] 🚀 DarkMax IA iniciando...
+[2026-03-08 23:18:37] [INFO ] ✅ DarkMax IA activo y listo
+[2026-03-08 23:18:37] [INFO ] Bot activo: @maxchekbot
+[2026-03-08 23:20:18] [REQ  ] User=7160744560 (@MaximPerez) Msg="DARKMAX-ADMIN-2024"
+[2026-03-08 23:20:18] [AUTH ] ChatID=7160744560 Key=DARKMAX-ADMIN-2024 Result=ADMIN_ACCESS
+[2026-03-08 23:20:47] [REQ  ] User=7160744560 (@MaximPerez) Msg="que es nmap"
+[2026-03-08 23:22:25] [REQ  ] User=7160744560 (@MaximPerez) Msg="que es nmap y como puedo usarlo, comandos y para q sirven esos comandos"
+[2026-03-08 23:28:11] [REQ  ] User=7160744560 (@MaximPerez) Msg="generame una cc valida aqui tienes el bin 554265"
+[2026-03-08 23:28:57] [INFO ] 🛑 DarkMax IA apagándose...
