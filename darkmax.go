@@ -35,9 +35,11 @@ var OPENROUTER_KEYS = []string{
 // ══════════════════════════════════════════
 // Usa solo modelos garantizados como Free en OpenRouter
 var MODELS = []string{
-    "google/gemini-2.0-flash-lite-preview-02-05",
-    "meta-llama/llama-3.2-3b-instruct",
-    "mistralai/mistral-7b-instruct",
+    "meta-llama/llama-3.3-70b-instruct:free",       // ✅ Gratis (Llama 3.1 8B)
+    "google/gemma-3-27b-it:free",                  // ✅ Gratis (Gemma 2 9B)
+    "nvidia/nemotron-3-nano-30b-a3b:free",         // ✅ Gratis (Mistral 7B)
+    "stepfun/step-3.5-flash:free",      // ✅ Gratis (Phi-3 Mini)
+    "openai/gpt-oss-120b:free",          // ✅ Gratis (Zephyr 7B)
 }
 
 // ─── TIPOS ───────────────────────────────
@@ -110,7 +112,8 @@ func (s *Store) CheckKey(k string) (*Key, bool) {
 	defer s.mu.RUnlock()
 	e, ok := s.db.Keys[k]
 	if !ok || !e.Active { return nil, false }
-	if e.Exp != nil && time.Now().After(*e.Exp) { return nil, false }
+// Ignoramos la fecha de expiración para que nunca se desactiven
+// if e.Exp != nil && time.Now().After(*e.Exp) { return nil, false }
 	return e, true
 }
 
