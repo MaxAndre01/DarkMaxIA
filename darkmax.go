@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -34,12 +34,10 @@ var OPENROUTER_KEYS = []string{
 }
 // ══════════════════════════════════════════
 // Usa solo modelos garantizados como Free en OpenRouter
-var MODELS = []string{
-    "meta-llama/llama-3.3-70b-instruct:free",       // ✅ Gratis (Llama 3.1 8B)
-    "google/gemma-3-27b-it:free",                  // ✅ Gratis (Gemma 2 9B)
-    "nvidia/nemotron-3-nano-30b-a3b:free",         // ✅ Gratis (Mistral 7B)
-    "stepfun/step-3.5-flash:free",      // ✅ Gratis (Phi-3 Mini)
-    "openai/gpt-oss-120b:free",          // ✅ Gratis (Zephyr 7B)
+var MODELS = []string{    
+
+    "google/gemma-3-27b-it:free",                  // ✅ Gratis (Gemma 2 9B)  
+    "stepfun/step-3.5-flash:free",     
 }
 
 // ─── TIPOS ───────────────────────────────
@@ -243,62 +241,58 @@ func (s *Store) AllSessions() []*Session {
 	return list
 }
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-	sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
-	hc := &http.Client{Timeout: 45 * time.Second}
+    sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
+    hc := &http.Client{Timeout: 45 * time.Second}
 
-	// Estructura de datos para la respuesta (Segura ante cambios de API)
-	type Response struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
+    type Response struct {
+        Choices []struct {
+            Message struct {
+                Content string `json:"content"`
+            } `json:"message"`
+        } `json:"choices"`
+        Error struct {
+            Message string `json:"message"`
+        } `json:"error"`
+    }
 
-	for _, model := range MODELS {
-		for _, key := range OPENROUTER_KEYS {
-			// 1. Pausa de seguridad (Rate-limiting)
-			time.Sleep(600 * time.Millisecond)
+    // Cambiamos el orden: Probamos combinaciones LLAVE+MODELO
+    // Esto es más rápido si una llave específica está baneada
+    for _, key := range OPENROUTER_KEYS {
+        for _, model := range MODELS {
+            time.Sleep(500 * time.Millisecond)
 
-			// 2. Construcción de la petición
-			reqBody, _ := json.Marshal(map[string]interface{}{
-				"model":    model,
-				"messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
-			})
+            reqBody, _ := json.Marshal(map[string]interface{}{
+                "model":    model,
+                "messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
+            })
 
-			r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
-			r.Header.Set("Authorization", "Bearer "+key)
-			r.Header.Set("HTTP-Referer", "https://darkmax.bot")
-			r.Header.Set("X-Title", "DarkMax-Bot")
-			r.Header.Set("Content-Type", "application/json")
+            r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
+            r.Header.Set("Authorization", "Bearer "+key)
+            r.Header.Set("HTTP-Referer", "https://darkmax.bot")
+            r.Header.Set("Content-Type", "application/json")
 
-			// 3. Ejecución y manejo de red
-			resp, err := hc.Do(r)
-			if err != nil {
-				continue // Si hay error de red, pasa a la siguiente llave/modelo
-			}
+            resp, err := hc.Do(r)
+            if err != nil {
+                continue 
+            }
 
-			// 4. Verificación de éxito
-			if resp.StatusCode == 200 {
-				var res Response
-				if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && len(res.Choices) > 0 {
-					content := strings.TrimSpace(res.Choices[0].Message.Content)
-					resp.Body.Close()
-					return content, nil
-				}
-			} else if resp.StatusCode == 429 {
-				// Si nos limitan por velocidad, esperamos un poco más antes de intentar
-				time.Sleep(3 * time.Second)
-			}
-			
-			resp.Body.Close()
-		}
-	}
+            // Capturamos el cuerpo para leer errores
+            body, _ := io.ReadAll(resp.Body)
+            resp.Body.Close()
 
-	// 5. Garantía de retorno (Nunca dejará de compilar)
-	return "", fmt.Errorf("todas las llaves y modelos fallaron")
+            if resp.StatusCode == 200 {
+                var res Response
+                if err := json.Unmarshal(body, &res); err == nil && len(res.Choices) > 0 {
+                    return strings.TrimSpace(res.Choices[0].Message.Content), nil
+                }
+            } else if resp.StatusCode == 429 {
+                time.Sleep(2 * time.Second) // Espera un poco más si hay saturación
+            }
+            // Si llega aquí, falló la combinación key+model, continúa
+        }
+    }
+    return "", fmt.Errorf("no se pudo obtener respuesta de ningún modelo")
 }
-
 // ─── BOT ─────────────────────────────────
 type Wizard struct {
 	Step string
