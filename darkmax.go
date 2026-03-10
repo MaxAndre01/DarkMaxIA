@@ -35,9 +35,9 @@ var OPENROUTER_KEYS = []string{
 // ══════════════════════════════════════════
 // Usa solo modelos garantizados como Free en OpenRouter
 var MODELS = []string{
-	"meta-llama/llama-3.1-8b-instruct:free",
-	"google/gemma-2-9b-it:free",
-	"mistralai/mistral-7b-instruct:free",
+    "google/gemini-2.0-flash-lite-preview-02-05",
+    "meta-llama/llama-3.2-3b-instruct",
+    "mistralai/mistral-7b-instruct",
 }
 
 // ─── TIPOS ───────────────────────────────
