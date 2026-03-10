@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
+	
 	"log"
 	"net/http"
 	"os"
@@ -33,12 +33,13 @@ var OPENROUTER_KEYS = []string{
     "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",
 }
 // ══════════════════════════════════════════
+// Usa solo modelos garantizados como Free en OpenRouter
 var MODELS = []string{
-	"meta-llama/llama-3.3-70b-instruct:free",
-	"google/gemini-2.0-flash-lite-preview-02-05:free",
-	"deepseek/deepseek-chat:free",
+	"meta-llama/llama-3.1-8b-instruct:free",
+	"google/gemma-2-9b-it:free",
 	"mistralai/mistral-7b-instruct:free",
 }
+
 // ─── TIPOS ───────────────────────────────
 type Rank string
 const (
@@ -238,45 +239,60 @@ func (s *Store) AllSessions() []*Session {
 	for _, v := range s.ses { list = append(list, v) }
 	return list
 }
-
-
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-	// ... (tus tipos M, Req y Res se quedan igual)
-
 	sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
-	// ... (tu lógica de rangos se queda igual)
+	hc := &http.Client{Timeout: 45 * time.Second}
 
-	hc := &http.Client{Timeout: 60 * time.Second}
+	// Estructura de datos para la respuesta (Segura ante cambios de API)
+	type Response struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
 
 	for _, model := range MODELS {
 		for _, key := range OPENROUTER_KEYS {
-			reqStruct := Req{Model: model, Messages: []M{{"system", sys}, {"user", msg}}}
-			reqBody, _ := json.Marshal(reqStruct)
+			// 1. Pausa de seguridad (Rate-limiting)
+			time.Sleep(600 * time.Millisecond)
 
-			r, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
-			if err != nil { continue }
+			// 2. Construcción de la petición
+			reqBody, _ := json.Marshal(map[string]interface{}{
+				"model":    model,
+				"messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
+			})
 
-			// HEADERS OBLIGATORIOS PARA EVITAR 401/403
+			r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
 			r.Header.Set("Authorization", "Bearer "+key)
+			r.Header.Set("HTTP-Referer", "https://darkmax.bot")
+			r.Header.Set("X-Title", "DarkMax-Bot")
 			r.Header.Set("Content-Type", "application/json")
-			r.Header.Set("HTTP-Referer", "https://localhost:3000") // Valor genérico para que OpenRouter no bloquee
-			r.Header.Set("X-Title", "DarkMax_Bot")
 
+			// 3. Ejecución y manejo de red
 			resp, err := hc.Do(r)
-			if err != nil { continue }
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				continue // Si una llave falla, la rotación pasa a la siguiente automáticamente
+			if err != nil {
+				continue // Si hay error de red, pasa a la siguiente llave/modelo
 			}
 
-			var res Res
-			json.NewDecoder(resp.Body).Decode(&res)
-			if len(res.Choices) > 0 {
-				return strings.TrimSpace(res.Choices[0].Message.Content), nil
+			// 4. Verificación de éxito
+			if resp.StatusCode == 200 {
+				var res Response
+				if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && len(res.Choices) > 0 {
+					content := strings.TrimSpace(res.Choices[0].Message.Content)
+					resp.Body.Close()
+					return content, nil
+				}
+			} else if resp.StatusCode == 429 {
+				// Si nos limitan por velocidad, esperamos un poco más antes de intentar
+				time.Sleep(3 * time.Second)
 			}
+			
+			resp.Body.Close()
 		}
 	}
+
+	// 5. Garantía de retorno (Nunca dejará de compilar)
 	return "", fmt.Errorf("todas las llaves y modelos fallaron")
 }
 
