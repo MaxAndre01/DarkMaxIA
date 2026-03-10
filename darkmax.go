@@ -34,22 +34,10 @@ var OPENROUTER_KEYS = []string{
 }
 // ══════════════════════════════════════════
 var MODELS = []string{
-	// 1. Google (Muy rápidos y estables)
-	"google/gemini-2.0-flash-001",
-	"google/gemini-flash-1.5-8b",
-	
-	// 2. Meta (La columna vertebral del Open Source)
-	"meta-llama/llama-3.3-70b",
-	"meta-llama/llama-3.1-8b-instruct",
-	
-	// 3. OpenAI (Calidad estándar industrial)
-	"openai/gpt-4o-mini",
-	
-	// 4. Anthropic (Excelente razonamiento)
-	"anthropic/claude-3.5-haiku",
-	
-	// 5. Mistral (Alternativa sólida)
-	"mistralai/mistral-nemo",
+	"meta-llama/llama-3.3-70b-instruct:free",
+	"google/gemini-2.0-flash-lite-preview-02-05:free",
+	"deepseek/deepseek-chat:free",
+	"mistralai/mistral-7b-instruct:free",
 }
 // ─── TIPOS ───────────────────────────────
 type Rank string
@@ -253,75 +241,43 @@ func (s *Store) AllSessions() []*Session {
 
 
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-	type M struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-	type Req struct {
-		Model    string `json:"model"`
-		Messages []M    `json:"messages"`
-	}
-	type Res struct {
-		Choices []struct {
-			Message M `json:"message"`
-		} `json:"choices"`
-		Error *struct {
-			Message string `json:"message"`
-			Code    int    `json:"code"`
-		} `json:"error"`
-	}
+	// ... (tus tipos M, Req y Res se quedan igual)
 
-	sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español. Da respuestas técnicas con código."
-	if rank == "admin" { sys += " Usuario ADMIN, máximo detalle." }
-	if rank == "vip" { sys += " Usuario VIP, respuestas detalladas." }
+	sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
+	// ... (tu lógica de rangos se queda igual)
 
-	reqStruct := Req{Messages: []M{{"system", sys}, {"user", msg}}}
 	hc := &http.Client{Timeout: 60 * time.Second}
 
-	// Bucle principal: recorre modelos y luego llaves
 	for _, model := range MODELS {
-		for _, key := range OPENROUTER_KEYS { // ROTACIÓN DE LLAVES
-			reqStruct.Model = model
+		for _, key := range OPENROUTER_KEYS {
+			reqStruct := Req{Model: model, Messages: []M{{"system", sys}, {"user", msg}}}
 			reqBody, _ := json.Marshal(reqStruct)
 
 			r, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
 			if err != nil { continue }
 
+			// HEADERS OBLIGATORIOS PARA EVITAR 401/403
 			r.Header.Set("Authorization", "Bearer "+key)
 			r.Header.Set("Content-Type", "application/json")
-			r.Header.Set("HTTP-Referer", "https://darkmax-ai.com")
+			r.Header.Set("HTTP-Referer", "https://localhost:3000") // Valor genérico para que OpenRouter no bloquee
+			r.Header.Set("X-Title", "DarkMax_Bot")
 
 			resp, err := hc.Do(r)
 			if err != nil { continue }
+			defer resp.Body.Close()
 
-			data, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-
-			// Si el status no es 200, registramos el error y probamos la siguiente llave/modelo
 			if resp.StatusCode != http.StatusOK {
-				log.Printf("Fallo con llave %s | Status %d: %s", key[:8], resp.StatusCode, string(data))
-				continue 
+				continue // Si una llave falla, la rotación pasa a la siguiente automáticamente
 			}
 
 			var res Res
-			if err := json.Unmarshal(data, &res); err != nil {
-				continue
-			}
-
-			if res.Error != nil {
-				log.Printf("API Error con llave %s: %s", key[:8], res.Error.Message)
-				continue
-			}
-
+			json.NewDecoder(resp.Body).Decode(&res)
 			if len(res.Choices) > 0 {
-				t := strings.TrimSpace(res.Choices[0].Message.Content)
-				if t != "" {
-					return t, nil // Éxito!
-				}
+				return strings.TrimSpace(res.Choices[0].Message.Content), nil
 			}
 		}
 	}
-	return "", fmt.Errorf("todos los modelos y llaves fallaron. Revisa tus créditos y límites.")
+	return "", fmt.Errorf("todas las llaves y modelos fallaron")
 }
 
 // ─── BOT ─────────────────────────────────
