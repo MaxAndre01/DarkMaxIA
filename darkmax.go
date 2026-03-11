@@ -595,9 +595,6 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
-		Error *struct {
-			Message string `json:"message"`
-		} `json:"error"`
 	}
 
 	totalKeys := len(keyMgr.keys)
@@ -606,7 +603,7 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
 		if ki < 0 { break }
 
 		for _, model := range MODELS {
-			// Evitar peticiones demasiado rápidas
+			// Pausa obligatoria para evitar ser detectado como bot de spam
 			time.Sleep(800 * time.Millisecond) 
 
 			p := map[string]interface{}{
@@ -621,7 +618,6 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
 			req, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(body))
 			req.Header.Set("Authorization", "Bearer "+keyMgr.key(ki))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("HTTP-Referer", "https://darkmax.bot")
 			req.Header.Set("X-Title", "DarkMax-Bot")
 
 			resp, err := httpClient.Do(req)
@@ -633,15 +629,19 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
 			if resp.StatusCode == 200 {
 				var res orResp
 				if err := json.Unmarshal(raw, &res); err == nil && len(res.Choices) > 0 {
+					atomic.AddInt64(&statsOK, 1)
 					return strings.TrimSpace(res.Choices[0].Message.Content), nil
 				}
-			} else if resp.StatusCode == 429 || resp.StatusCode == 402 {
+			} else if resp.StatusCode == 429 || resp.StatusCode == 401 || resp.StatusCode == 402 {
+				// Si la llave falla por limites o créditos, la enfriamos 5 min
 				keyMgr.setCooldown(ki, 5*time.Minute)
-				break // Salta a la siguiente llave
+				break // SALTAR A LA SIGUIENTE LLAVE INMEDIATAMENTE
 			}
+			// Si es error 500 o 503, simplemente probamos el siguiente modelo
 		}
 	}
-	return "", fmt.Errorf("fallo total")
+	atomic.AddInt64(&statsErrors, 1)
+	return "", fmt.Errorf("fallo total de llaves y modelos")
 }
 
 // ─── BOT ─────────────────────────────────────────────────────
