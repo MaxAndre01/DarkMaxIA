@@ -1241,23 +1241,6 @@ func main() {
 		log.Fatal("ERROR: Pon tu token de Telegram en TELEGRAM")
 	}
 
-	// ─── PARCHE PARA RENDER ─────────────────────────────────────
-	// Esto crea un servidor web que le dice a Render: "Sigo vivo"
-	go func() {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "DarkMax IA esta operativo 🚀")
-		})
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080"
-		}
-		lg("INFO", "Iniciando servidor de vida en puerto "+port)
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
-			lg("ERROR", "Servidor HTTP falló: "+err.Error())
-		}
-	}()
-	// ────────────────────────────────────────────────────────────
-
 	// Inicializar el gestor de keys
 	keyMgr = newKeyManager(OPENROUTER_KEYS)
 
