@@ -1,3 +1,199 @@
+
+Conversación con Gemini
+Has dicho
+hay un problema es la apis se estan apagando solas es el unico problema o creo q es q si la usas x veces se apagan o creo q si dura mucho tiempo sin usarlas o nose dime usted q es
+
+Gemini ha dicho
+Analizando el código de DarkMax IA, he detectado que el problema de que las APIs "se apaguen" o dejen de responder no se debe a que el código las apague voluntariamente, sino a una combinación de gestión de cuotas, errores de red y la naturaleza de las keys gratuitas de OpenRouter.
+
+Aquí te detallo las razones técnicas por las que sientes que se "apagan" y cómo solucionarlo:
+
+1. El problema de las "Free Keys" y el Error 402
+En tu función askAI, tienes este bloque:
+
+Go
+case 402:
+    // Créditos agotados en esta key
+    lg("WARN", fmt.Sprintf("key[%d] — 402 sin creditos, cambiando key", ki))
+    goto nextKey
+¿Qué está pasando? OpenRouter, aunque uses modelos :free, a veces requiere un saldo mínimo o tiene límites de "puntos" diarios por key. Si una key llega a su límite de peticiones por minuto (RPM) o por día, devuelve un error 402 o 429. Tu código simplemente salta a la siguiente, pero si las 5 keys que pusiste se agotan, el bot dirá: "todos los modelos y llaves fallaron".
+
+2. Timeouts de Red (50 segundos)
+Tienes un timeout de 50 * time.Second. Los modelos gratuitos de OpenRouter suelen ser lentos porque tienen baja prioridad. Si el modelo tarda 51 segundos, tu código corta la conexión y parece que la API "murió", cuando en realidad solo estaba saturada.
+
+3. Falta de Persistencia Real del Estado de las Keys
+Tu código guarda las keys.json del bot (las que tú creas), pero no guarda el estado de salud de las OPENROUTER_KEYS.
+
+Si una de tus 5 keys de OpenRouter falla, el bot lo intenta de nuevo en la siguiente petición desde cero.
+
+No hay un sistema que diga "esta key está muerta por 1 hora, no la uses". Esto hace que el bot pierda mucho tiempo reintentando keys que ya sabe que están fallando.
+
+Soluciones Recomendadas
+A. Implementa un "Cooldown" (Enfriamiento)
+Modifica el código para que si una key devuelve un error 402 (sin créditos) o 429 (saturada), se marque como "temporalmente deshabilitada" durante 5 o 10 minutos. Esto evitará que el bot se quede "pensando" en vano.
+
+B. Aumenta el Rango de Modelos
+En tu variable MODELS, estás usando modelos muy pesados como llama-3.3-70b. Estos suelen fallar mucho en la versión gratuita. Te sugiero priorizar modelos más ligeros que rara vez se caen:
+
+google/gemini-2.0-flash-exp:free (Muy estable)
+
+mistralai/mistral-7b-instruct:free
+
+huggingfaceh4/zephyr-7b-beta:free
+
+C. El problema del "Sleep"
+En tu código tienes:
+
+Go
+case 429:
+    time.Sleep(500 * time.Millisecond)
+    continue
+Esto es peligroso en un bot de Telegram con muchos usuarios. Si 10 personas preguntan a la vez y la API da error 429, estás bloqueando el hilo de ejecución por medio segundo repetidamente.
+
+¿Es posible que se apague el proceso?
+Si el bot deja de responder por completo (ni siquiera el comando /start funciona), el problema no es la API de OpenRouter, sino tu hosting:
+
+Si usas un hosting gratuito (como Render o Replit), ellos "duermen" el proceso si no recibe tráfico HTTP externo.
+
+Solución: Asegúrate de que el proceso corra en segundo plano con algo como pm2 o un servicio de systemd:
+
+pm2 start darkmax.go --interpreter go
+
+¿Quieres que te ayude a modificar la función askAI para que gestione mejor la rotación de keys y no se "atasque" cuando una falla?
+Has dicho
+COMO CONFIGURO ESTO
+
+Gemini ha dicho
+¡Bingo! La imagen confirma mi sospecha: estás usando Render. El problema de que el bot "se apague" es exactamente lo que te mencioné: Render duerme los "Web Services" gratuitos si no reciben tráfico HTTP constante.
+
+Como tu bot de Telegram es un proceso que "escucha" (long polling) y no una página web que recibe visitas, Render cree que no se está usando y lo apaga a los 15-30 minutos de inactividad.
+
+Para configurar esa pantalla correctamente y evitar que se muera, haz lo siguiente:
+
+1. Configuración de Comandos (En la pantalla de la imagen)
+Los comandos que tienes ahí están bien, pero asegúrate de que coincidan con el nombre de tu archivo:
+
+Build Command: go build -o darkmax darkmax.go
+
+Start Command: ./darkmax
+
+2. El truco para que NO SE APAGUE (Importante)
+Render apaga los servicios gratuitos a menos que escuchen en un puerto. Para "engañar" a Render y que mantenga el bot vivo, debes añadir un pequeño servidor web dentro de tu código de Go que no haga nada, solo para que Render vea actividad.
+
+Añade esto al final de tu función main() en darkmax.go, justo antes de bot.run():
+
+Go
+// Crear un servidor web simple para que Render no apague el bot
+go func() {
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintf(w, "Bot DarkMax está vivo ✅")
+    })
+    port := os.Getenv("PORT")
+    if port == "" { port = "8080" }
+    http.ListenAndServe(":" + port, nil)
+}()
+3. Evitar que el disco se borre
+Render tiene un sistema de archivos efímero. Esto significa que tu archivo keys.json se borrará cada vez que el bot se reinicie.
+
+Solución: En el panel de Render, busca la pestaña "Disks" y crea uno de 1GB (el mínimo). Móntalo en una carpeta llamada /data y en tu código cambia la ruta de keys.json a /data/keys.json.
+
+Resumen de pasos en Render:
+Instace Type: Asegúrate de elegir "Free".
+
+Environment Variables: Haz clic en el botón "Advanced" o busca la pestaña "Env Vars" y añade una variable llamada PORT con el valor 8080.
+
+Deploy: Dale a "Create Web Service".
+
+¿Quieres que te pase el código completo con el "parche" para Render y la rotación de modelos más estable?
+
+Has dicho
+creo q esta puesto el truco para q no se apague
+
+Gemini ha dicho
+He revisado tu archivo darkmax.go y, aunque el código es muy robusto en cuanto a la rotación de keys y manejo de errores de la IA, no tiene el "truco" para evitar que Render lo apague.
+
+En el código que enviaste, la función main() termina llamando a bot.run(), pero no hay ningún servidor HTTP escuchando peticiones. Render, al ser un Web Service, espera que tu aplicación responda a pings en un puerto (normalmente el 8080). Si no lo hace, Render asume que el despliegue falló o que no hay actividad y apaga el proceso.
+
+Aquí tienes las modificaciones exactas que debes hacer en tu archivo para que funcione en Render sin apagarse:
+
+1. Añade el "Ping" de Render
+Busca tu función main() al final del archivo y modifícala para que quede así (he añadido el bloque go func() que crea el servidor web):
+
+Go
+func main() {
+	if len(OPENROUTER_KEYS) == 0 {
+		log.Fatal("ERROR: Añade al menos una key en OPENROUTER_KEYS")
+	}
+	if TELEGRAM == "" {
+		log.Fatal("ERROR: Pon tu token de Telegram en TELEGRAM")
+	}
+
+	// ─── PARCHE PARA RENDER ─────────────────────────────────────
+	// Esto crea un servidor web que le dice a Render: "Sigo vivo"
+	go func() {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "DarkMax IA esta operativo 🚀")
+		})
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		lg("INFO", "Iniciando servidor de vida en puerto "+port)
+		if err := http.ListenAndServe(":"+port, nil); err != nil {
+			lg("ERROR", "Servidor HTTP falló: "+err.Error())
+		}
+	}()
+	// ────────────────────────────────────────────────────────────
+
+	// Inicializar el gestor de keys
+	keyMgr = newKeyManager(OPENROUTER_KEYS)
+
+	lg("INFO", fmt.Sprintf("DarkMax IA iniciando — %d keys | %d modelos", len(OPENROUTER_KEYS), len(MODELS)))
+
+	bot, err := newBot()
+	if err != nil {
+		log.Fatalf("Error creando bot: %v", err)
+	}
+	bot.run()
+}
+2. El problema del almacenamiento (Persistencia)
+Tu código usa keys.json para guardar los usuarios y sus permisos.
+
+Advertencia: En Render, si no configuras un Disk (Disco), cada vez que el bot se reinicie o se actualice, perderás todas las keys que hayas creado y todos los usuarios tendrán que loguearse de nuevo.
+
+Solución: En el panel de Render, ve a la pestaña "Disks", crea uno y móntalo en /etc/darkmax. Luego, en tu código, cambia la ruta de carga:
+
+Go
+// Cambia esto en la función loadStore()
+if raw, err := os.ReadFile("/etc/darkmax/keys.json"); err == nil { ... }
+// Y en la función flush()
+_ = os.WriteFile("/etc/darkmax/keys.json", raw, 0600)
+3. Configuración en el Dashboard de Render
+Cuando vayas a la pantalla que me mostraste en la imagen anterior, asegúrate de poner estos valores:
+
+Runtime: Go
+
+Build Command: go build -o app darkmax.go
+
+Start Command: ./app
+
+¿Por qué se "apagaban" las APIs?
+Viendo tu código, tienes una gestión de cooldown excelente (60s para error 429 y 10m para error 402). Si sientes que "se apagan", lo más probable es que:
+
+Render mató el proceso: Al no detectar el puerto 8080, cerró el bot entero.
+
+Límite de OpenRouter: Si usas las mismas keys en varios sitios, los modelos :free tienen un límite estricto de peticiones por minuto. Con el cambio de arriba (el servidor web), al menos el proceso de Go seguirá corriendo siempre.
+
+¿Quieres que te genere el archivo .go completo ya corregido para que solo tengas que copiar y pegar?
+
+Como estás trabajando en Go y sistemas de archivos, te sugiero como siguiente paso implementar un sistema de logs en archivo además de la consola, para que puedas ver por qué falló la API incluso si no estás mirando el panel de Render en ese momento. ¿Te gustaría ayuda con eso?
+
+
+Mira aprende a esconder los payloads y después te fijas que haces
+
+
+Gemini es una IA y puede cometer errores.
+
 package main
 
 import (
@@ -389,60 +585,63 @@ var keyMgr *KeyManager
 //  4. Si la key recibe 402 → cooldown 10min y cambia de key
 //  5. Si todos los modelos fallan con una key → cambia de key
 //  6. Repite hasta que el contexto expire
-
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-    sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
-    hc := &http.Client{Timeout: 45 * time.Second}
+	sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
+	if rank == "admin" { sys += " Modo ADMIN activo." }
 
-    type Response struct {
-        Choices []struct {
-            Message struct {
-                Content string `json:"content"`
-            } `json:"message"`
-        } `json:"choices"`
-        Error struct {
-            Message string `json:"message"`
-        } `json:"error"`
-    }
+	type orResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
 
-    // Cambiamos el orden: Probamos combinaciones LLAVE+MODELO
-    // Esto es más rápido si una llave específica está baneada
-    for _, key := range OPENROUTER_KEYS {
-        for _, model := range MODELS {
-            time.Sleep(500 * time.Millisecond)
+	totalKeys := len(keyMgr.keys)
+	for i := 0; i < totalKeys; i++ {
+		ki := keyMgr.next(ctx, (keyMgr.current+i)%totalKeys)
+		if ki < 0 { break }
 
-            reqBody, _ := json.Marshal(map[string]interface{}{
-                "model":    model,
-                "messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
-            })
+		for _, model := range MODELS {
+			// Evitar peticiones demasiado rápidas
+			time.Sleep(800 * time.Millisecond) 
 
-            r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
-            r.Header.Set("Authorization", "Bearer "+key)
-            r.Header.Set("HTTP-Referer", "https://darkmax.bot")
-            r.Header.Set("Content-Type", "application/json")
+			p := map[string]interface{}{
+				"model": model,
+				"messages": []map[string]string{
+					{"role": "system", "content": sys},
+					{"role": "user", "content": msg},
+				},
+			}
+			body, _ := json.Marshal(p)
 
-            resp, err := hc.Do(r)
-            if err != nil {
-                continue 
-            }
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+keyMgr.key(ki))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("HTTP-Referer", "https://darkmax.bot")
+			req.Header.Set("X-Title", "DarkMax-Bot")
 
-            // Capturamos el cuerpo para leer errores
-            body, _ := io.ReadAll(resp.Body)
-            resp.Body.Close()
+			resp, err := httpClient.Do(req)
+			if err != nil { continue }
 
-            if resp.StatusCode == 200 {
-                var res Response
-                if err := json.Unmarshal(body, &res); err == nil && len(res.Choices) > 0 {
-                    return strings.TrimSpace(res.Choices[0].Message.Content), nil
-                }
-            } else if resp.StatusCode == 429 {
-                time.Sleep(2 * time.Second) // Espera un poco más si hay saturación
-            }
-            // Si llega aquí, falló la combinación key+model, continúa
-        }
-    }
-	
-    return "", fmt.Errorf("no se pudo obtener respuesta de ningún modelo")
+			raw, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if resp.StatusCode == 200 {
+				var res orResp
+				if err := json.Unmarshal(raw, &res); err == nil && len(res.Choices) > 0 {
+					return strings.TrimSpace(res.Choices[0].Message.Content), nil
+				}
+			} else if resp.StatusCode == 429 || resp.StatusCode == 402 {
+				keyMgr.setCooldown(ki, 5*time.Minute)
+				break // Salta a la siguiente llave
+			}
+		}
+	}
+	return "", fmt.Errorf("fallo total")
 }
 
 // ─── BOT ─────────────────────────────────────────────────────
@@ -1132,21 +1331,23 @@ func dur(d time.Duration) string {
 
 // ─── MAIN ────────────────────────────────────────────────────
 func main() {
-	if len(OPENROUTER_KEYS) == 0 {
-		log.Fatal("ERROR: Añade al menos una key en OPENROUTER_KEYS")
-	}
-	if TELEGRAM == "" {
-		log.Fatal("ERROR: Pon tu token de Telegram en TELEGRAM")
+	if len(OPENROUTER_KEYS) == 0 || TELEGRAM == "" {
+		log.Fatal("Faltan llaves o token")
 	}
 
-	// Inicializar el gestor de keys
+	// SERVIDOR PARA QUE RENDER NO APAGUE EL BOT
+	go func() {
+		port := os.Getenv("PORT")
+		if port == "" { port = "8080" }
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "DarkMax IA está VIVO 🚀")
+		})
+		lg("INFO", "Servidor de vida en puerto "+port)
+		http.ListenAndServe(":"+port, nil)
+	}()
+
 	keyMgr = newKeyManager(OPENROUTER_KEYS)
-
-	lg("INFO", fmt.Sprintf("DarkMax IA iniciando — %d keys | %d modelos", len(OPENROUTER_KEYS), len(MODELS)))
-
 	bot, err := newBot()
-	if err != nil {
-		log.Fatalf("Error creando bot: %v", err)
-	}
+	if err != nil { log.Fatal(err) }
 	bot.run()
 }
