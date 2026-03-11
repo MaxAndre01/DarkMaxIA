@@ -35,17 +35,17 @@ var OPENROUTER_KEYS = []string{
 // ══════════════════════════════════════════
 // Modelos free de OpenRouter verificados y estables (2025)
 var MODELS = []string{
-  "google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "meta-llama/llama-3.1-8b-instruct:free",
+  "meta-llama/llama-3.3-70b-instruct",
+  "openai/gpt-oss-120b",
+  "stepfun/step-3.5-flash",
   "qwen/qwen3-8b:free",
   "meta-llama/llama-3.2-3b-instruct",
     "openrouter/free",
-    "stepfun/step-3.5-flash:free",
-  "microsoft/phi-4-reasoning-plus:free",
-  "deepseek/deepseek-r1-0528:free",
-  "mistralai/devstral-small:free",
-  "google/gemma-3-27b-it:free",
+    "stepfun/step-3.5-flash",
+  "google/gemma-3-27b-it",
+  "mistralai/mistral-small-3.1-24b-instruct",
+  "nousresearch/hermes-3-llama-3.1-405b",
+  "google/gemma-3-27b-it",
 }
 // ─── TIPOS ───────────────────────────────
 type Rank string
