@@ -33,13 +33,20 @@ var OPENROUTER_KEYS = []string{
     "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",
 }
 // ══════════════════════════════════════════
-// Usa solo modelos garantizados como Free en OpenRouter
-var MODELS = []string{    
-
-    "google/gemma-3-27b-it:free",                  // ✅ Gratis (Gemma 2 9B)  
-    "stepfun/step-3.5-flash:free",     
+// Modelos free de OpenRouter verificados y estables (2025)
+var MODELS = []string{
+  "google/gemini-2.0-flash-exp:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "qwen/qwen3-8b:free",
+  "meta-llama/llama-3.2-3b-instruct",
+    "openrouter/free",
+    "stepfun/step-3.5-flash:free",
+  "microsoft/phi-4-reasoning-plus:free",
+  "deepseek/deepseek-r1-0528:free",
+  "mistralai/devstral-small:free",
+  "google/gemma-3-27b-it:free",
 }
-
 // ─── TIPOS ───────────────────────────────
 type Rank string
 const (
@@ -70,8 +77,9 @@ type Session struct {
 }
 
 type DB struct {
-	Keys     map[string]*Key `json:"keys"`
-	AdminKey string          `json:"admin_key"`
+	Keys     map[string]*Key      `json:"keys"`
+	AdminKey string               `json:"admin_key"`
+	Sessions map[string]*Session  `json:"sessions,omitempty"` // persistir sesiones
 }
 
 // ─── STORE ───────────────────────────────
@@ -90,6 +98,13 @@ func loadStore() *Store {
 	}
 	if raw, err := os.ReadFile("keys.json"); err == nil {
 		json.Unmarshal(raw, &s.db)
+		// Restaurar sesiones persistidas
+		if s.db.Sessions != nil {
+			for _, ses := range s.db.Sessions {
+				s.ses[ses.ID] = ses
+			}
+			lg("INFO", fmt.Sprintf("Sesiones restauradas: %d", len(s.ses)))
+		}
 	} else {
 		s.db.Keys["DARKMAX-DEMO"] = &Key{
 			K: "DARKMAX-DEMO", Rank: USER, Owner: "Demo",
@@ -97,10 +112,18 @@ func loadStore() *Store {
 		}
 		s.flush()
 	}
+	if s.db.Sessions == nil {
+		s.db.Sessions = make(map[string]*Session)
+	}
 	return s
 }
 
 func (s *Store) flush() {
+	// Sincronizar sesiones en memoria al mapa para persistir
+	s.db.Sessions = make(map[string]*Session)
+	for id, ses := range s.ses {
+		s.db.Sessions[fmt.Sprintf("%d", id)] = ses
+	}
 	raw, _ := json.MarshalIndent(s.db, "", "  ")
 	os.WriteFile("keys.json", raw, 0600)
 }
@@ -133,6 +156,7 @@ func (s *Store) Logout(id int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.ses, id)
+	s.flush()
 }
 
 func (s *Store) Auth(id int64) bool {
@@ -240,59 +264,163 @@ func (s *Store) AllSessions() []*Session {
 	for _, v := range s.ses { list = append(list, v) }
 	return list
 }
-func askAI(ctx context.Context, msg, rank string) (string, error) {
-    sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
-    hc := &http.Client{Timeout: 45 * time.Second}
 
-    type Response struct {
-        Choices []struct {
-            Message struct {
-                Content string `json:"content"`
-            } `json:"message"`
-        } `json:"choices"`
-        Error struct {
-            Message string `json:"message"`
-        } `json:"error"`
-    }
-
-    // Cambiamos el orden: Probamos combinaciones LLAVE+MODELO
-    // Esto es más rápido si una llave específica está baneada
-    for _, key := range OPENROUTER_KEYS {
-        for _, model := range MODELS {
-            time.Sleep(500 * time.Millisecond)
-
-            reqBody, _ := json.Marshal(map[string]interface{}{
-                "model":    model,
-                "messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
-            })
-
-            r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
-            r.Header.Set("Authorization", "Bearer "+key)
-            r.Header.Set("HTTP-Referer", "https://darkmax.bot")
-            r.Header.Set("Content-Type", "application/json")
-
-            resp, err := hc.Do(r)
-            if err != nil {
-                continue 
-            }
-
-            // Capturamos el cuerpo para leer errores
-            body, _ := io.ReadAll(resp.Body)
-            resp.Body.Close()
-
-            if resp.StatusCode == 200 {
-                var res Response
-                if err := json.Unmarshal(body, &res); err == nil && len(res.Choices) > 0 {
-                    return strings.TrimSpace(res.Choices[0].Message.Content), nil
-                }
-            } else if resp.StatusCode == 429 {
-                time.Sleep(2 * time.Second) // Espera un poco más si hay saturación
-            }
-            // Si llega aquí, falló la combinación key+model, continúa
-        }
-    }
-    return "", fmt.Errorf("no se pudo obtener respuesta de ningún modelo")
+// orError extrae el mensaje de error de OpenRouter si viene en el JSON
+func orError(body []byte) string {
+	var e struct {
+		Error struct {
+			Message string `json:"message"`
+			Code    int    `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &e) == nil && e.Error.Message != "" {
+		return fmt.Sprintf("code=%d msg=%s", e.Error.Code, e.Error.Message)
+	}
+	return ""
 }
+
+func askAI(ctx context.Context, msg, rank string) (string, error) {
+	// Prompt según rango
+	sys := "Eres DarkMax IA, experto en ciberseguridad, hacking, OSINT y programacion. Responde siempre en español. Da respuestas tecnicas con codigo cuando sea necesario."
+	switch rank {
+	case "admin":
+		sys += " Usuario ADMIN: maximo nivel de detalle tecnico, sin restricciones de longitud."
+	case "vip":
+		sys += " Usuario VIP: respuestas detalladas y ampliadas."
+	}
+
+	// Cliente HTTP con timeouts explícitos
+	hc := &http.Client{
+		Timeout: 50 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        20,
+			IdleConnTimeout:     60 * time.Second,
+			DisableCompression:  false,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+	}
+
+	// Estructura de respuesta OpenRouter
+	type orResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Usage struct {
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+
+	// Payload base — se reutiliza con cada intento
+	type payload struct {
+		Model    string                   `json:"model"`
+		Messages []map[string]string      `json:"messages"`
+		MaxTokens int                     `json:"max_tokens"`
+		Stream   bool                     `json:"stream"`
+	}
+
+	messages := []map[string]string{
+		{"role": "system", "content": sys},
+		{"role": "user",   "content": msg},
+	}
+
+	// Rotación: intentamos cada key con cada modelo
+	for ki, key := range OPENROUTER_KEYS {
+		for mi, model := range MODELS {
+
+			// Verificar contexto antes de cada intento
+			select {
+			case <-ctx.Done():
+				return "", fmt.Errorf("timeout global alcanzado")
+			default:
+			}
+
+			p := payload{
+				Model:     model,
+				Messages:  messages,
+				MaxTokens: 2048,
+				Stream:    false,
+			}
+			bodyBytes, err := json.Marshal(p)
+			if err != nil {
+				continue
+			}
+
+			req, err := http.NewRequestWithContext(ctx, "POST",
+				"https://openrouter.ai/api/v1/chat/completions",
+				bytes.NewReader(bodyBytes))
+			if err != nil {
+				continue
+			}
+
+			// Cabeceras obligatorias OpenRouter
+			req.Header.Set("Authorization",  "Bearer "+key)
+			req.Header.Set("Content-Type",   "application/json")
+			req.Header.Set("Accept",         "application/json")
+			req.Header.Set("HTTP-Referer",   "https://darkmax.bot")
+			req.Header.Set("X-Title",        "DarkMax-Bot")
+
+			resp, err := hc.Do(req)
+			if err != nil {
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — net error: %v", ki, mi, model, err))
+				continue
+			}
+
+			rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // max 1MB
+			resp.Body.Close()
+
+			switch resp.StatusCode {
+			case 200:
+				var res orResp
+				if err := json.Unmarshal(rawBody, &res); err != nil {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — JSON parse error: %v", ki, mi, model, err))
+					continue
+				}
+				if len(res.Choices) == 0 {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — choices vacías", ki, mi, model))
+					continue
+				}
+				content := strings.TrimSpace(res.Choices[0].Message.Content)
+				if content == "" {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — content vacío (finish=%s)",
+						ki, mi, model, res.Choices[0].FinishReason))
+					continue
+				}
+				lg("OK", fmt.Sprintf("key[%d] model=%s tokens=%d", ki, model, res.Usage.CompletionTokens))
+				return content, nil
+
+			case 429:
+				// Modelo saturado: probar siguiente modelo (no cambiar key)
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s - 429 saturado, siguiente modelo", ki, mi, model))
+				time.Sleep(500 * time.Millisecond)
+				continue
+
+			case 402:
+				// Créditos agotados en esta key
+				lg("WARN", fmt.Sprintf("key[%d] — 402 sin creditos, cambiando key", ki))
+				goto nextKey
+
+			case 503, 502, 504:
+				// Modelo sobrecargado, probar siguiente modelo
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — %d sobrecargado", ki, mi, model, resp.StatusCode))
+				time.Sleep(300 * time.Millisecond)
+				continue
+
+			default:
+				errMsg := orError(rawBody)
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — HTTP %d %s", ki, mi, model, resp.StatusCode, errMsg))
+				continue
+			}
+		}
+		nextKey:
+	}
+
+	return "", fmt.Errorf("todos los modelos y llaves fallaron")
+}
+
+
 // ─── BOT ─────────────────────────────────
 type Wizard struct {
 	Step string
@@ -350,36 +478,95 @@ func (b *Bot) sendLong(id int64, text string) {
 	}
 	if text != "" { b.send(id, text) }
 }
-
 func (b *Bot) handle(upd tgbotapi.Update) {
 	if upd.CallbackQuery != nil { b.cb(upd.CallbackQuery); return }
 	if upd.Message == nil { return }
 
-	id   := upd.Message.Chat.ID
-	user := upd.Message.From.UserName
-	text := strings.TrimSpace(upd.Message.Text)
+	// Protección: algunos mensajes de canales no tienen From
+	if upd.Message.From == nil { return }
+
+	userID := upd.Message.From.ID
+	chatID := upd.Message.Chat.ID
+	user   := upd.Message.From.UserName
+	if user == "" { user = fmt.Sprintf("id%d", userID) }
+	text   := strings.TrimSpace(upd.Message.Text)
 	if text == "" { return }
 
-	lg("REQ", fmt.Sprintf("@%s: %s", user, func() string {
-		if len(text) > 50 { return text[:50]+"..." }; return text
+	chatType := upd.Message.Chat.Type // "private", "group", "supergroup", "channel"
+	isGroup  := chatType == "group" || chatType == "supergroup"
+
+	lg("DBG", fmt.Sprintf("chat_type=%s chat_id=%d user_id=%d text=%q", chatType, chatID, userID, func() string {
+		if len(text) > 40 { return text[:40] + "..." }; return text
 	}()))
 
-	// Comandos siempre primero
-	if upd.Message.IsCommand() { b.cmd(id, user, upd.Message.Command()); return }
+	if isGroup {
+		if upd.Message.IsCommand() {
+			lg("DBG", "grupo: comando ignorado")
+			return
+		}
 
-	// Sin sesion → auth
-	if !b.st.Auth(id) { b.auth(id, user, text); return }
+		botMention  := "@" + b.api.Self.UserName
+		isMentioned  := strings.Contains(strings.ToLower(text), strings.ToLower(botMention))
+		isReplyToBot := upd.Message.ReplyToMessage != nil &&
+			upd.Message.ReplyToMessage.From != nil &&
+			upd.Message.ReplyToMessage.From.ID == b.api.Self.ID
 
-	// Wizard activo
-	if w, ok := b.wiz[id]; ok && time.Now().Before(w.Exp) { b.wizStep(id, user, text, w); return }
+		lg("DBG", fmt.Sprintf("grupo: mention=%v replyToBot=%v botMention=%s", isMentioned, isReplyToBot, botMention))
 
-	// Texto admin
-	if strings.HasPrefix(text, "/") { b.adminCmd(id, user, text); return }
+		if !isMentioned && !isReplyToBot {
+			lg("DBG", "grupo: mensaje ignorado (sin mención ni reply)")
+			return
+		}
 
-	// IA
-	b.ai(id, user, text)
+		if !b.st.Auth(userID) {
+			lg("DBG", fmt.Sprintf("grupo: @%s sin sesión", user))
+			b.sendAccesoDenegado(chatID, user)
+			return
+		}
+
+		// Quitar la mención del texto
+		clean := strings.TrimSpace(strings.ReplaceAll(text, botMention, ""))
+		if clean == "" {
+			b.api.Send(tgbotapi.NewMessage(chatID, "🤖 ¿En qué te puedo ayudar?"))
+			return
+		}
+
+		lg("REQ", fmt.Sprintf("GRUPO @%s: %s", user, func() string {
+			if len(clean) > 50 { return clean[:50] + "..." }; return clean
+		}()))
+
+		b.aiGroup(userID, chatID, user, clean)
+		return
+	}
+
+	// ── PRIVADO ──────────────────────────────────────────────────
+	lg("REQ", fmt.Sprintf("@%s: %s", user, func() string {
+		if len(text) > 50 { return text[:50] + "..." }; return text
+	}()))
+
+	if upd.Message.IsCommand() { b.cmd(userID, user, upd.Message.Command()); return }
+
+	if !b.st.Auth(userID) { b.auth(userID, user, text); return }
+
+	if w, ok := b.wiz[userID]; ok && time.Now().Before(w.Exp) { b.wizStep(userID, user, text, w); return }
+
+	if strings.HasPrefix(text, "/") { b.adminCmd(userID, user, text); return }
+
+	b.ai(userID, user, text)
 }
 
+// Nueva función auxiliar para el botón de acceso
+func (b *Bot) sendAccesoDenegado(chatID int64, username string) {
+	msg := tgbotapi.NewMessage(chatID, "🚫 @"+username+", no tienes acceso en este grupo. Por favor, loguéate en mi privado.")
+	link := "https://t.me/" + b.api.Self.UserName + "?start=auth"
+	kb := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("🔑 Loguearme en privado", link),
+		),
+	)
+	msg.ReplyMarkup = kb
+	b.api.Send(msg)
+}
 func (b *Bot) cmd(id int64, user, cmd string) {
 	switch cmd {
 	case "start", "menu":
@@ -437,6 +624,46 @@ func (b *Bot) ai(id int64, user, text string) {
 		return
 	}
 	b.sendLong(id, resp)
+}
+
+// aiGroup: igual que ai() pero responde en el chat del grupo, no en el privado del usuario
+func (b *Bot) aiGroup(userID, chatID int64, user, text string) {
+	b.mu.Lock()
+	if b.fly[userID] {
+		b.mu.Unlock()
+		b.api.Send(tgbotapi.NewMessage(chatID, "⏳ @"+user+", espera la respuesta anterior..."))
+		return
+	}
+	b.fly[userID] = true
+	b.mu.Unlock()
+	defer func() { b.mu.Lock(); b.fly[userID] = false; b.mu.Unlock() }()
+
+	b.st.Inc(userID)
+	b.api.Send(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+
+	rank := "user"
+	if ses, ok := b.st.Ses(userID); ok { rank = string(ses.Rank) }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	defer cancel()
+
+	resp, err := askAI(ctx, text, rank)
+	if err != nil {
+		lg("ERROR", fmt.Sprintf("AI grupo @%s: %v", user, err))
+		b.api.Send(tgbotapi.NewMessage(chatID, "⚠️ @"+user+", error con la IA. Intenta de nuevo."))
+		return
+	}
+	// Enviar respuesta al GRUPO
+	for len(resp) > 4000 {
+		cut := 4000
+		for i := cut; i > 3700 && i > 0; i-- {
+			if resp[i] == '\n' { cut = i; break }
+		}
+		b.api.Send(tgbotapi.NewMessage(chatID, resp[:cut]))
+		resp = resp[cut:]
+		time.Sleep(100*time.Millisecond)
+	}
+	if resp != "" { b.api.Send(tgbotapi.NewMessage(chatID, resp)) }
 }
 
 func (b *Bot) logout(id int64, user string) {

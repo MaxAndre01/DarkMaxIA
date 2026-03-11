@@ -10,5 +10,23 @@
       "uses": 0
     }
   },
-  "admin_key": "DARKMAX-ADMIN-2024"
+  "admin_key": "DARKMAX-ADMIN-2024",
+  "sessions": {
+    "7160744560": {
+      "ID": 7160744560,
+      "User": "darkmax03",
+      "Rank": "admin",
+      "Key": "DARKMAX-ADMIN-2024",
+      "Start": "2026-03-10T19:50:31.778479692-04:00",
+      "Msgs": 2
+    },
+    "8002664118": {
+      "ID": 8002664118,
+      "User": "NeoParadox7",
+      "Rank": "admin",
+      "Key": "DARKMAX-ADMIN-2024",
+      "Start": "2026-03-10T20:20:49.452454253-04:00",
+      "Msgs": 0
+    }
+  }
 }
