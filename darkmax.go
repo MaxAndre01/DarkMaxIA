@@ -389,68 +389,109 @@ var keyMgr *KeyManager
 //  4. Si la key recibe 402 → cooldown 10min y cambia de key
 //  5. Si todos los modelos fallan con una key → cambia de key
 //  6. Repite hasta que el contexto expire
+
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-	sys := "Eres DarkMax IA, experto en ciberseguridad, hacking, OSINT y programacion. Responde siempre en español."
-	if rank == "admin" {
-		sys += " Usuario ADMIN: maximo nivel de detalle tecnico."
-	}
+    sys := "Eres DarkMax IA, experto en ciberseguridad. Responde en español."
+    hc := &http.Client{Timeout: 45 * time.Second}
 
-	hc := &http.Client{Timeout: 45 * time.Second}
+    type Response struct {
+        Choices []struct {
+            Message struct {
+                Content string `json:"content"`
+            } `json:"message"`
+        } `json:"choices"`
+        Error struct {
+            Message string `json:"message"`
+        } `json:"error"`
+    }
 
-	type orResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-		Error *struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
+    // Cambiamos el orden: Probamos combinaciones LLAVE+MODELO
+    // Esto es más rápido si una llave específica está baneada
+    for _, key := range OPENROUTER_KEYS {
+        for _, model := range MODELS {
+            time.Sleep(500 * time.Millisecond)
 
-	// Probamos cada llave con cada modelo
-	for _, key := range OPENROUTER_KEYS {
-		for _, model := range MODELS {
-			// Pequeña espera para no saturar la API
-			time.Sleep(500 * time.Millisecond)
+            reqBody, _ := json.Marshal(map[string]interface{}{
+                "model":    model,
+                "messages": []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
+            })
 
-			p := map[string]interface{}{
-				"model":     model,
-				"messages":  []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
-				"max_tokens": 2048,
-			}
-			body, _ := json.Marshal(p)
+            r, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(reqBody))
+            r.Header.Set("Authorization", "Bearer "+key)
+            r.Header.Set("HTTP-Referer", "https://darkmax.bot")
+            r.Header.Set("Content-Type", "application/json")
 
-			req, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(body))
-			req.Header.Set("Authorization", "Bearer "+key)
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("HTTP-Referer", "https://darkmax.bot")
-			req.Header.Set("X-Title", "DarkMax-Bot")
-
-			resp, err := hc.Do(req)
-			if err != nil {
-				lg("WARN", fmt.Sprintf("Error de red con modelo %s: %v", model, err))
-				continue
-			}
-
-			raw, _ := io.ReadAll(resp.Body)
+            resp, err := hc.Do(r)
+            if err != nil {
+                continue 
+            }
+						raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // max 2MB
 			resp.Body.Close()
 
-			if resp.StatusCode == 200 {
+			switch resp.StatusCode {
+			case 200:
 				var res orResp
-				if err := json.Unmarshal(raw, &res); err == nil && len(res.Choices) > 0 {
-					content := strings.TrimSpace(res.Choices[0].Message.Content)
-					if content != "" {
-						return content, nil
-					}
+				if err := json.Unmarshal(raw, &res); err != nil {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — JSON error: %v", ki, mi, model, err))
+					continue
 				}
-			} else {
-				lg("WARN", fmt.Sprintf("Modelo %s falló con estado %d", model, resp.StatusCode))
+				// Algunos 200 vienen con error en el body
+				if res.Error != nil {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — body error: %s", ki, mi, model, res.Error.Message))
+					continue
+				}
+				if len(res.Choices) == 0 {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — choices vacías", ki, mi, model))
+					continue
+				}
+				content := strings.TrimSpace(res.Choices[0].Message.Content)
+				if content == "" {
+					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — content vacío finish=%s",
+						ki, mi, model, res.Choices[0].FinishReason))
+					continue
+				}
+				lg("OK", fmt.Sprintf("key[%d] model=%s tokens=%d", ki, model, res.Usage.CompletionTokens))
+				atomic.AddInt64(&statsOK, 1)
+				keyOK = true
+				return content, nil
+
+			case 429:
+				// Rate limit: descansar esta key 60s y probar otra
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — 429 rate limit", ki, mi, model))
+				keyMgr.setCooldown(ki, 60*time.Second)
+				goto nextKey
+
+			case 402:
+				// Sin créditos: descansar esta key 10 minutos
+				lg("WARN", fmt.Sprintf("key[%d] — 402 sin créditos", ki))
+				keyMgr.setCooldown(ki, 10*time.Minute)
+				goto nextKey
+
+			case 401:
+				// Key inválida: descansar 30 minutos (no tiene solución en caliente)
+				lg("ERROR", fmt.Sprintf("key[%d] — 401 inválida", ki))
+				keyMgr.setCooldown(ki, 30*time.Minute)
+				goto nextKey
+
+			case 503, 502, 504:
+				// Servidor caído temporalmente: espera corta y siguiente modelo
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — %d servidor", ki, mi, model, resp.StatusCode))
+				jitter, _ := rand.Int(rand.Reader, big.NewInt(500))
+				time.Sleep(time.Duration(300+jitter.Int64()) * time.Millisecond)
+				continue
+
+			default:
+				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — HTTP %d", ki, mi, model, resp.StatusCode))
+				continue
 			}
-		}
-	}
-	return "", fmt.Errorf("todos los modelos y llaves fallaron")
+ 
+    }
+
+
+		
+    return "", fmt.Errorf("no se pudo obtener respuesta de ningún modelo")
 }
+
 // ─── BOT ─────────────────────────────────────────────────────
 type Wizard struct {
 	Step string
