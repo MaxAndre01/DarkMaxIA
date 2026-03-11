@@ -425,70 +425,23 @@ func askAI(ctx context.Context, msg, rank string) (string, error) {
             if err != nil {
                 continue 
             }
-						raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // max 2MB
-			resp.Body.Close()
 
-			switch resp.StatusCode {
-			case 200:
-				var res orResp
-				if err := json.Unmarshal(raw, &res); err != nil {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — JSON error: %v", ki, mi, model, err))
-					continue
-				}
-				// Algunos 200 vienen con error en el body
-				if res.Error != nil {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — body error: %s", ki, mi, model, res.Error.Message))
-					continue
-				}
-				if len(res.Choices) == 0 {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — choices vacías", ki, mi, model))
-					continue
-				}
-				content := strings.TrimSpace(res.Choices[0].Message.Content)
-				if content == "" {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — content vacío finish=%s",
-						ki, mi, model, res.Choices[0].FinishReason))
-					continue
-				}
-				lg("OK", fmt.Sprintf("key[%d] model=%s tokens=%d", ki, model, res.Usage.CompletionTokens))
-				atomic.AddInt64(&statsOK, 1)
-				keyOK = true
-				return content, nil
+            // Capturamos el cuerpo para leer errores
+            body, _ := io.ReadAll(resp.Body)
+            resp.Body.Close()
 
-			case 429:
-				// Rate limit: descansar esta key 60s y probar otra
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — 429 rate limit", ki, mi, model))
-				keyMgr.setCooldown(ki, 60*time.Second)
-				goto nextKey
-
-			case 402:
-				// Sin créditos: descansar esta key 10 minutos
-				lg("WARN", fmt.Sprintf("key[%d] — 402 sin créditos", ki))
-				keyMgr.setCooldown(ki, 10*time.Minute)
-				goto nextKey
-
-			case 401:
-				// Key inválida: descansar 30 minutos (no tiene solución en caliente)
-				lg("ERROR", fmt.Sprintf("key[%d] — 401 inválida", ki))
-				keyMgr.setCooldown(ki, 30*time.Minute)
-				goto nextKey
-
-			case 503, 502, 504:
-				// Servidor caído temporalmente: espera corta y siguiente modelo
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — %d servidor", ki, mi, model, resp.StatusCode))
-				jitter, _ := rand.Int(rand.Reader, big.NewInt(500))
-				time.Sleep(time.Duration(300+jitter.Int64()) * time.Millisecond)
-				continue
-
-			default:
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — HTTP %d", ki, mi, model, resp.StatusCode))
-				continue
-			}
- 
+            if resp.StatusCode == 200 {
+                var res Response
+                if err := json.Unmarshal(body, &res); err == nil && len(res.Choices) > 0 {
+                    return strings.TrimSpace(res.Choices[0].Message.Content), nil
+                }
+            } else if resp.StatusCode == 429 {
+                time.Sleep(2 * time.Second) // Espera un poco más si hay saturación
+            }
+            // Si llega aquí, falló la combinación key+model, continúa
+        }
     }
-
-
-		
+	
     return "", fmt.Errorf("no se pudo obtener respuesta de ningún modelo")
 }
 
