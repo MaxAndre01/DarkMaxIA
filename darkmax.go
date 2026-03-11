@@ -390,163 +390,67 @@ var keyMgr *KeyManager
 //  5. Si todos los modelos fallan con una key → cambia de key
 //  6. Repite hasta que el contexto expire
 func askAI(ctx context.Context, msg, rank string) (string, error) {
-	sys := "Eres DarkMax IA, experto en ciberseguridad, hacking, OSINT y programacion. " +
-		"Responde siempre en español. Da respuestas tecnicas con codigo cuando sea necesario. " +
-		"Sé directo y claro."
-	switch rank {
-	case "admin":
-		sys += " Usuario ADMIN: maximo nivel de detalle tecnico, sin restricciones de longitud."
-	case "vip":
-		sys += " Usuario VIP: respuestas detalladas y ampliadas."
+	sys := "Eres DarkMax IA, experto en ciberseguridad, hacking, OSINT y programacion. Responde siempre en español."
+	if rank == "admin" {
+		sys += " Usuario ADMIN: maximo nivel de detalle tecnico."
 	}
 
-	messages := []map[string]string{
-		{"role": "system", "content": sys},
-		{"role": "user", "content": msg},
-	}
+	hc := &http.Client{Timeout: 45 * time.Second}
 
 	type orResp struct {
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
-			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
-		Usage struct {
-			CompletionTokens int `json:"completion_tokens"`
-		} `json:"usage"`
 		Error *struct {
 			Message string `json:"message"`
-			Code    int    `json:"code"`
 		} `json:"error"`
 	}
 
-	type payload struct {
-		Model     string              `json:"model"`
-		Messages  []map[string]string `json:"messages"`
-		MaxTokens int                 `json:"max_tokens"`
-	}
+	// Probamos cada llave con cada modelo
+	for _, key := range OPENROUTER_KEYS {
+		for _, model := range MODELS {
+			// Pequeña espera para no saturar la API
+			time.Sleep(500 * time.Millisecond)
 
-	// Máximo intentos total = keys × modelos, pero el contexto corta antes si expira
-	totalKeys := len(keyMgr.keys)
-	startKey := keyMgr.current // punto de inicio para la rotación
-
-	for attempt := 0; attempt < totalKeys; attempt++ {
-		// Obtener siguiente key disponible
-		ki := keyMgr.next(ctx, (startKey+attempt-1+totalKeys)%totalKeys)
-		if ki < 0 {
-			break // contexto expirado
-		}
-
-		keyOK := false // ¿algún modelo tuvo éxito con esta key?
-
-		for mi, model := range MODELS {
-			select {
-			case <-ctx.Done():
-				atomic.AddInt64(&statsErrors, 1)
-				return "", fmt.Errorf("timeout global")
-			default:
-			}
-
-			p := payload{
-				Model:     model,
-				Messages:  messages,
-				MaxTokens: 2048,
+			p := map[string]interface{}{
+				"model":     model,
+				"messages":  []map[string]string{{"role": "system", "content": sys}, {"role": "user", "content": msg}},
+				"max_tokens": 2048,
 			}
 			body, _ := json.Marshal(p)
 
-			req, err := http.NewRequestWithContext(ctx, "POST",
-				"https://openrouter.ai/api/v1/chat/completions",
-				bytes.NewReader(body))
-			if err != nil {
-				continue
-			}
-			req.Header.Set("Authorization", "Bearer "+keyMgr.key(ki))
+			req, _ := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+key)
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Accept", "application/json")
 			req.Header.Set("HTTP-Referer", "https://darkmax.bot")
 			req.Header.Set("X-Title", "DarkMax-Bot")
 
-			resp, err := httpClient.Do(req)
+			resp, err := hc.Do(req)
 			if err != nil {
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] net error: %v", ki, mi, err))
+				lg("WARN", fmt.Sprintf("Error de red con modelo %s: %v", model, err))
 				continue
 			}
 
-			raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // max 2MB
+			raw, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 
-			switch resp.StatusCode {
-			case 200:
+			if resp.StatusCode == 200 {
 				var res orResp
-				if err := json.Unmarshal(raw, &res); err != nil {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — JSON error: %v", ki, mi, model, err))
-					continue
+				if err := json.Unmarshal(raw, &res); err == nil && len(res.Choices) > 0 {
+					content := strings.TrimSpace(res.Choices[0].Message.Content)
+					if content != "" {
+						return content, nil
+					}
 				}
-				// Algunos 200 vienen con error en el body
-				if res.Error != nil {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — body error: %s", ki, mi, model, res.Error.Message))
-					continue
-				}
-				if len(res.Choices) == 0 {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — choices vacías", ki, mi, model))
-					continue
-				}
-				content := strings.TrimSpace(res.Choices[0].Message.Content)
-				if content == "" {
-					lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — content vacío finish=%s",
-						ki, mi, model, res.Choices[0].FinishReason))
-					continue
-				}
-				lg("OK", fmt.Sprintf("key[%d] model=%s tokens=%d", ki, model, res.Usage.CompletionTokens))
-				atomic.AddInt64(&statsOK, 1)
-				keyOK = true
-				return content, nil
-
-			case 429:
-				// Rate limit: descansar esta key 60s y probar otra
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — 429 rate limit", ki, mi, model))
-				keyMgr.setCooldown(ki, 60*time.Second)
-				goto nextKey
-
-			case 402:
-				// Sin créditos: descansar esta key 10 minutos
-				lg("WARN", fmt.Sprintf("key[%d] — 402 sin créditos", ki))
-				keyMgr.setCooldown(ki, 10*time.Minute)
-				goto nextKey
-
-			case 401:
-				// Key inválida: descansar 30 minutos (no tiene solución en caliente)
-				lg("ERROR", fmt.Sprintf("key[%d] — 401 inválida", ki))
-				keyMgr.setCooldown(ki, 30*time.Minute)
-				goto nextKey
-
-			case 503, 502, 504:
-				// Servidor caído temporalmente: espera corta y siguiente modelo
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — %d servidor", ki, mi, model, resp.StatusCode))
-				jitter, _ := rand.Int(rand.Reader, big.NewInt(500))
-				time.Sleep(time.Duration(300+jitter.Int64()) * time.Millisecond)
-				continue
-
-			default:
-				lg("WARN", fmt.Sprintf("key[%d] model[%d] %s — HTTP %d", ki, mi, model, resp.StatusCode))
-				continue
+			} else {
+				lg("WARN", fmt.Sprintf("Modelo %s falló con estado %d", model, resp.StatusCode))
 			}
 		}
-
-		if !keyOK {
-			// Todos los modelos fallaron con esta key sin 429/402,
-			// pequeño cooldown para evitar spam
-			keyMgr.setCooldown(ki, 5*time.Second)
-		}
-
-	nextKey:
 	}
-
-	atomic.AddInt64(&statsErrors, 1)
-	return "", fmt.Errorf("todos los modelos y llaves fallaron — intenta en unos segundos")
+	return "", fmt.Errorf("todos los modelos y llaves fallaron")
 }
-
 // ─── BOT ─────────────────────────────────────────────────────
 type Wizard struct {
 	Step string
