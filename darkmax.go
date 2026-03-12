@@ -46,7 +46,6 @@ const (
 	VIP   Rank = "vip"
 	ADMIN Rank = "admin"
 )
-
 type Key struct {
 	K         string     `json:"key"`
 	Rank      Rank       `json:"rank"`
