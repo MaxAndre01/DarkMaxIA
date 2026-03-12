@@ -35,7 +35,7 @@ var OPENROUTER_KEYS = []string{
 // ══════════════════════════════════════════
 // Modelos free de OpenRouter verificados y estables (2025)
 var MODELS = []string{
-	"meta-llama/llama-3.3-70b-instruct",
+
 	"meta-llama/llama-3.2-3b-instruct",
 	"stepfun/step-3.5-flash",
 }
