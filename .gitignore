@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# Keys and sessions database
+keys.json
+
+# Compiled binary
+darkmax
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
