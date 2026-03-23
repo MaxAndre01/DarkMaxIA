@@ -22,23 +22,10 @@ import (
 
 // ══════════════════════════════════════════
 // CAMBIA SOLO ESTAS DOS LINEAS
-const TELEGRAM  = "8444790565:AAFZJvpPGFBZAjm-jvmYkiVXQcIRiCMH3rg"
+const TELEGRAM  = ""
 
 // En la parte superior de tu archivo darkmax.go
-var OPENROUTER_KEYS = []string{
-    "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",
-    "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",
-    "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",
-    "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",
-    "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",
-}
-// ══════════════════════════════════════════
-// Modelos free de OpenRouter verificados y estables (2025)
-var MODELS = []string{
-	"meta-llama/llama-3.3-70b-instruct",
-	"meta-llama/llama-3.2-3b-instruct",
-	"stepfun/step-3.5-flash",
-}
+
 // ─── TIPOS ───────────────────────────────
 type Rank string
 const (
