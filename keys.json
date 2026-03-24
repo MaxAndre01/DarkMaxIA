@@ -8,17 +8,29 @@
       "at": "2026-03-09T17:29:54.512561229-04:00",
       "active": true,
       "uses": 0
+    },
+    "VIP-70DBDA66CCDB39E9428D682D": {
+      "key": "VIP-70DBDA66CCDB39E9428D682D",
+      "rank": "vip",
+      "owner": "max",
+      "by": "darkmax03",
+      "at": "2026-03-23T21:12:27.904154684-04:00",
+      "exp": "2026-03-30T21:12:27.904153513-04:00",
+      "used_by": 7160744560,
+      "active": true,
+      "uses": 2
     }
   },
-  "admin_key": "DARKMAX-ADMIN-2024",
+  "admin_key": "DARKMAX-ADMIN-123",
   "sessions": {
     "7160744560": {
       "ID": 7160744560,
       "User": "darkmax03",
-      "Rank": "admin",
-      "Key": "DARKMAX-ADMIN-2024",
-      "Start": "2026-03-10T19:50:31.778479692-04:00",
-      "Msgs": 2
+      "Rank": "vip",
+      "Key": "VIP-70DBDA66CCDB39E9428D682D",
+      "Start": "2026-03-23T21:12:43.594598657-04:00",
+      "Msgs": 0,
+      "Mode": "normal"
     },
     "8002664118": {
       "ID": 8002664118,
@@ -26,7 +38,8 @@
       "Rank": "admin",
       "Key": "DARKMAX-ADMIN-2024",
       "Start": "2026-03-10T20:20:49.452454253-04:00",
-      "Msgs": 0
+      "Msgs": 0,
+      "Mode": ""
     }
   }
 }
