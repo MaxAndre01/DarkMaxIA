@@ -1,3 +1,14 @@
+---
+title: DarkMax Bot
+emoji: 🤖
+colorFrom: blue
+colorTo: red
+sdk: docker
+sdk_version: latest
+app_file: Dockerfile
+pinned: false
+---
+
 # DarkMax Bot
 
 Bot de Telegram con IA para consultas de ciberseguridad, hacking, OSINT y programación.
