@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -31,6 +32,8 @@ var OPENROUTER_KEYS []string
 var ADMIN_KEY string
 
 func init() {
+	_ = godotenv.Load() // carga .env si existe
+
 	TELEGRAM_BOT_TOKEN = os.Getenv("TELEGRAM_BOT_TOKEN")
 	if TELEGRAM_BOT_TOKEN == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN no definido en variables de entorno")
