@@ -1,32 +1,24 @@
 {
   "keys": {
     "DARKMAX-DEMO": {
-      "key": "DARKMAX-DEMO",
+      "key": "00-DEM00O",
       "rank": "user",
-      "owner": "Demo",
-      "by": "system",
+      "owner": "00",
+      "by": "00",
       "at": "2026-03-09T17:29:54.512561229-04:00",
       "active": true,
       "uses": 0
     }
   },
-  "admin_key": "DARKMAX-ADMIN-2024",
+  "admin_key": "00-00-00",
   "sessions": {
     "7160744560": {
       "ID": 7160744560,
-      "User": "darkmax03",
+      "User": "username",
       "Rank": "admin",
-      "Key": "DARKMAX-ADMIN-2024",
+      "Key": "00-00-00",
       "Start": "2026-03-10T19:50:31.778479692-04:00",
       "Msgs": 2
-    },
-    "8002664118": {
-      "ID": 8002664118,
-      "User": "NeoParadox7",
-      "Rank": "admin",
-      "Key": "DARKMAX-ADMIN-2024",
-      "Start": "2026-03-10T20:20:49.452454253-04:00",
-      "Msgs": 0
     }
   }
 }
